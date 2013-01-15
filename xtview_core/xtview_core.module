@@ -1,0 +1,216 @@
+<?php
+
+/*
+ * hook_perm
+ */
+
+function xtview_core_permission() {
+    return array(
+        'administer_xtview' => array(
+            'title' => t('Administer xtView'),
+            'description' => t('Administer xtView Core & its sub modules. DONT GIVE TO NON-ADMINISTRATORS'),
+        ),
+    );
+}
+
+/*
+ * hook_init
+ */
+
+function xtview_core_init() {
+    global $xt_connection;
+    $xt_connection = NULL;
+}
+
+/*
+ * hook menu
+ */
+function xtview_core_menu() {
+    $item = array();
+
+    $item['admin/config/xtview'] = array(
+        'title' => 'xtView',
+        'page callback' => 'xtview_settings_main',
+        'access arguments' => array('administer_xtview'),
+        'type' => MENU_CALLBACK,
+        // not needed remove 'page arguments' => array('xtview_core_settings'),
+    );
+    $item['admin/config/xtview/core'] = array(
+        'title' => 'Core Settings',
+        'page callback' => 'drupal_get_form',
+        'page arguments' => array('xtview_core_settings_form'),
+        'access arguments' => array('administer_xtview'),
+        'type' => MENU_CALLBACK,
+    );
+
+    return $item;
+}
+
+function xtview_settings_main() {
+    // $o for output
+    $o = 'a<br>';
+    function xtview_settings_main_links() {
+        //taken and mod from thes
+        $links = &drupal_static(__FUNCTION__);
+
+        if (!isset($links)) {
+            $links = array();
+            $query = db_select('menu_links', 'ml', array('fetch' => PDO::FETCH_ASSOC));
+            $query->join('menu_router', 'm', 'm.path = ml.router_path');
+            $query
+                ->fields('ml')
+            // Weight should be taken from {menu_links}, not {menu_router}.
+                ->fields('m', array_diff(drupal_schema_fields_sql('menu_router'), array('weight')))
+                ->condition('ml.link_path', 'admin/config/xtview/%', 'LIKE')
+                ->condition('ml.hidden', 0, '>=')
+                ->condition('ml.module', 'system')
+                ->condition('m.number_parts', 1, '>');
+            foreach ($query->execute() as $link) {
+                _menu_link_translate($link);
+                if ($link['access']) {
+                    $links[$link['router_path']] = $link;
+                }
+            }
+            return $links;
+        }
+    }
+
+    $links = xtview_settings_main_links();
+
+    foreach($links as &$link) {
+        $o .= l($link['link_title'], $link['link_path']) . '<br>';
+    }
+
+    return $o;
+}
+
+function xtview_core_settings_form($form, &$form_state) {
+    $default_xt_core_settings = array(
+        'database' => array(
+            'host' => '',
+            'port' => '5432',
+            'database' => '',
+            'user' => '',
+            'password' => '',
+            'ssl' => FALSE,
+            'enhancedauthentication' => FALSE,
+        )
+
+    );
+    $settings = variable_get('xt_core_settings', $default_xt_core_settings);
+
+
+    $database = $settings['database'];
+    $form['database'] = array(
+        '#type' => 'fieldset',
+        '#title' => t('Database Connection'),
+        '#collapsible' => FALSE,
+        '#collapsed' => FALSE,
+    );
+    $form['database']['host'] = array(
+        '#type' => 'textfield',
+        '#title' => t('Host'),
+        '#default_value' => $database['host'],
+        '#required' => TRUE,
+    );
+    $form['database']['port'] = array(
+        '#type' => 'textfield',
+        '#title' => t('Port'),
+        '#default_value' => $database['port'],
+        '#required' => TRUE,
+    );
+    $form['database']['database'] = array(
+        '#type' => 'textfield',
+        '#title' => t('Database'),
+        '#default_value' => $database['database'],
+        '#required' => TRUE,
+    );
+    $form['database']['user'] = array(
+        '#type' => 'textfield',
+        '#title' => t('User'),
+        '#default_value' => $database['user'],
+        '#required' => TRUE,
+    );
+    $form['database']['password'] = array(
+        '#type' => 'password',
+        '#title' => t('Password'),
+        '#default_value' => $database['password'],
+        '#required' => ($database['password']=='') ? TRUE : FALSE,
+    );
+    $form['database']['ssl'] = array(
+        '#type' => 'checkbox',
+        '#title' => t('SSL Connection'),
+        '#default_value' => $database['ssl'],
+
+    );
+    $form['database']['enhancedauthentication'] = array(
+        '#type' => 'checkbox',
+        '#title' => t('Enhanced Authentication'),
+        '#default_value' => $database['enhancedauthentication'],
+    );
+
+
+
+    $form['save'] = array(
+        '#type' => 'submit',
+        '#value' => t('Save'),
+    );
+    return $form;
+}
+
+function xtview_core_settings_form_validate($form, $form_state) {
+    //dpm($form_state['values']);
+    $v = $form_state['values'];
+    $settings = array(
+        'host' => $v['host'],
+        'port' => $v['port'],
+        'database' => $v['database'],
+        'user' => $v['user'],
+        'password' => $v['password'],
+        'ssl' => $v['ssl'],
+        'enhancedauthentication' => $v['enhancedauthentication'],
+    );
+    $v = NULL;
+    xt_connect($settings);
+    global $xt_connection;
+    dpm($xt_connection);
+    form_error($form, 'Connection couldn\'t be established using the parameters below.');
+}
+
+
+function xt_connect($settings = NULL) {
+    IF($settings == NULL) {drupal_exit();}
+    global $xt_connection;
+
+    IF (!isset($xt_connection) && $settings!=Null) {
+        $host = $settings['host'];
+        $port = $settings['port'];
+        $database = $settings['database'];
+        $user = $settings['user'];
+        $password = $settings['password'];
+        $ssl = $settings['database'];
+        $enhancedauthentication = $settings['enhancedauthentication'];
+
+        IF ($enhancedauthentication == TRUE) {
+            //_cPassword + "xTuple" + _cUsername
+            $password = $password . 'xTuple' . $user;
+        }
+        $xt_connection = new PDO(
+            t('pgsql:dbname=!database;user=!user;password=!password;host=!host',
+                array(
+                    '!host' => $host,
+                    '!database' => $database,
+                    '!user' => $user,
+                    '!password' => $password,
+                )
+            )
+        );
+    }
+}
+
+function xtview_core_exit() {
+    //xt_connect();
+    global $xt_connection;
+    $xt_connection = NULL;
+    dpm($xt_connection);
+}

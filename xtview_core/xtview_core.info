@@ -1,0 +1,6 @@
+name = xtView Core
+description = Core files and structure needed for xtView modules.
+package = xtView
+core = 7.x
+php = 5.2
+dependencies[] = views
