@@ -32,15 +32,16 @@ function xtview_core_menu() {
         'title' => 'xtView',
         'page callback' => 'xtview_settings_main',
         'access arguments' => array('administer_xtview'),
-        'type' => MENU_CALLBACK,
+        //'type' => MENU_CALLBACK,
         // not needed remove 'page arguments' => array('xtview_core_settings'),
     );
     $item['admin/config/xtview/core'] = array(
         'title' => 'Core Settings',
+        'description' => t('xtView database settings'),
         'page callback' => 'drupal_get_form',
         'page arguments' => array('xtview_core_settings_form'),
         'access arguments' => array('administer_xtview'),
-        'type' => MENU_CALLBACK,
+        //'type' => MENU_CALLBACK,
     );
 
     return $item;
@@ -51,7 +52,7 @@ function xtview_settings_main() {
     $o = 'a<br>';
     function xtview_settings_main_links() {
         //taken and mod from thes
-        $links = &drupal_static(__FUNCTION__);
+        $links = & drupal_static(__FUNCTION__);
 
         if (!isset($links)) {
             $links = array();
@@ -77,7 +78,7 @@ function xtview_settings_main() {
 
     $links = xtview_settings_main_links();
 
-    foreach($links as &$link) {
+    foreach ($links as &$link) {
         $o .= l($link['link_title'], $link['link_path']) . '<br>';
     }
 
@@ -135,7 +136,7 @@ function xtview_core_settings_form($form, &$form_state) {
         '#type' => 'password',
         '#title' => t('Password'),
         '#default_value' => $database['password'],
-        '#required' => ($database['password']=='') ? TRUE : FALSE,
+        '#required' => ($database['password'] == '') ? TRUE : FALSE,
     );
     $form['database']['ssl'] = array(
         '#type' => 'checkbox',
@@ -148,7 +149,6 @@ function xtview_core_settings_form($form, &$form_state) {
         '#title' => t('Enhanced Authentication'),
         '#default_value' => $database['enhancedauthentication'],
     );
-
 
 
     $form['save'] = array(
@@ -179,10 +179,12 @@ function xtview_core_settings_form_validate($form, $form_state) {
 
 
 function xt_connect($settings = NULL) {
-    IF($settings == NULL) {drupal_exit();}
+    IF ($settings == NULL) {
+        drupal_exit();
+    }
     global $xt_connection;
 
-    IF (!isset($xt_connection) && $settings!=Null) {
+    IF (!isset($xt_connection) && $settings != Null) {
         $host = $settings['host'];
         $port = $settings['port'];
         $database = $settings['database'];
@@ -209,7 +211,6 @@ function xt_connect($settings = NULL) {
 }
 
 function xtview_core_exit() {
-    //xt_connect();
     global $xt_connection;
     $xt_connection = NULL;
     dpm($xt_connection);
